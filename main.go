@@ -148,6 +148,7 @@ func main() {
 			Email: "bennettbailey@gmail.com",
 		},
 	}
+	app.Version = "1.0"
 	app.Usage = "inject cloud-configs into cloud-formation templates"
 	app.Commands = []cli.Command{
 		{
