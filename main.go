@@ -85,9 +85,16 @@ func inject(toInject, toReceive string, start, end int64) {
 	}
 
 	receivingScanner := bufio.NewScanner(receiving)
-	lines := []string{}
+	preLines := ""
+	postLines := ""
+	var numLines int64 = 0
 	for receivingScanner.Scan() {
-		lines = append(lines, receivingScanner.Text())
+		numLines++
+		if numLines < start {
+			preLines = preLines + receivingScanner.Text() + "\n"
+		} else if numLines > end {
+			postLines = postLines + receivingScanner.Text() + "\n"
+		}
 	}
 	if err := receivingScanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
@@ -101,20 +108,19 @@ func inject(toInject, toReceive string, start, end int64) {
 	defer injecting.Close()
 
 	injectingScanner := bufio.NewScanner(injecting)
-	linesToInject := []string{}
+	injectLines := ""
 	for injectingScanner.Scan() {
-		linesToInject = append(linesToInject, injectingScanner.Text())
+		injectLines = injectLines + injectingScanner.Text() + "\n"
 	}
 	if err := injectingScanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
 	}
 
 	// combine all parts of the file into one
-	fmt.Printf("=> Injecting %s into %s...", toInject, toReceive)
-	pre := lines[0 : start-1]
-	post := lines[end:]
-	injectedLines := append(pre, linesToInject...)
-	injectedLines = append(injectedLines, post...)
+	fmt.Printf("=> Injecting %s into %s...\n", toInject, toReceive)
+	k := strings.LastIndex(injectLines, "\\n\",")
+	injectLines = injectLines[:k] + "\""
+	injectedLines := preLines + injectLines + postLines
 
 	// write to the receiving file
 	receiving.Close()
@@ -123,10 +129,7 @@ func inject(toInject, toReceive string, start, end int64) {
 		log.Fatal(err)
 	}
 	defer receivingWrite.Close()
-
-	for _, s := range injectedLines {
-		receivingWrite.WriteString(s + "\n")
-	}
+	receivingWrite.WriteString(injectedLines)
 	receivingWrite.Sync()
 }
 
