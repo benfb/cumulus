@@ -160,7 +160,7 @@ func main() {
 			Name:  "format",
 			Usage: "format a cloud-config file into an acceptable JSON structure",
 			Flags: []cli.Flag{
-				cli.BoolTFlag{
+				cli.BoolFlag{
 					Name:  "tmp",
 					Usage: "write the cloud-config to a tmp file",
 				},
@@ -184,7 +184,7 @@ func main() {
 			Name:  "inject",
 			Usage: "inject a file into another, first removing from line1 to line2",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
+				cli.BoolTFlag{
 					Name:  "format",
 					Usage: "format the cloud-config before injecting it",
 				},
