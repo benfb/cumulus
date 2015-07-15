@@ -19,3 +19,7 @@ Alternatively, you can just format the cloud-config and write it to a file.
 Or you can output to STDOUT and pipe the output somewhere else.
 
 `cumulus format cloud-config.yaml | cat -n`
+
+Finally, if you've already done the hard work of formatting your cloud-config it can be inserted automatically.
+
+`cumulus inject --format=false formatted-cloud-config.yaml cloud-formation.json 146 267`
