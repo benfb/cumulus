@@ -78,6 +78,7 @@ func formatTmp(cc string) *os.File {
 
 func inject(toInject, toReceive string, start, end int64) {
 	fmt.Printf("=> Removing lines [%d:%d] in %s...\n", start, end, toReceive)
+
 	// read in the lines to be received
 	receiving, err := os.Open(toReceive)
 	if err != nil {
@@ -116,10 +117,14 @@ func inject(toInject, toReceive string, start, end int64) {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
 	}
 
+	// make sure that the last line gets special treatment
+	k := strings.LastIndex(injectLines, "\\n\",")
+	if k != -1 {
+		injectLines = injectLines[:k] + "\""
+	}
+
 	// combine all parts of the file into one
 	fmt.Printf("=> Injecting %s into %s...\n", toInject, toReceive)
-	k := strings.LastIndex(injectLines, "\\n\",")
-	injectLines = injectLines[:k] + "\""
 	injectedLines := preLines + injectLines + postLines
 
 	// write to the receiving file
@@ -155,7 +160,7 @@ func main() {
 			Name:  "format",
 			Usage: "format a cloud-config file into an acceptable JSON structure",
 			Flags: []cli.Flag{
-				cli.BoolFlag{
+				cli.BoolTFlag{
 					Name:  "tmp",
 					Usage: "write the cloud-config to a tmp file",
 				},
@@ -185,8 +190,14 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) {
-				start, _ := strconv.ParseInt(c.Args().Get(2), 0, 0)
-				end, _ := strconv.ParseInt(c.Args().Get(3), 0, 0)
+				start, err := strconv.ParseInt(c.Args().Get(2), 0, 0)
+				if err != nil {
+					log.Fatal("start must be an integer")
+				}
+				end, err := strconv.ParseInt(c.Args().Get(3), 0, 0)
+				if err != nil {
+					log.Fatal("start must be an integer")
+				}
 				if c.Bool("format") == true {
 					injectAndFormat(c.Args().First(), c.Args().Get(1), start, end)
 				} else {
