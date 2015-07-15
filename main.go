@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -49,6 +50,30 @@ func formatOut(cc, outPath string) {
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, "reading standard input:", err)
 	}
+}
+
+func formatTmp(cc string) *os.File {
+	fmt.Printf("=> Writing formatted cloud-config to a temporary file...\n")
+	file, err := os.Open(cc)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	tmp, err := ioutil.TempFile("/tmp", "cloudcfg")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		tmp.WriteString("\"" + strings.Replace(scanner.Text(), "\"", "\\\"", -1) + "\\n\",\n")
+	}
+	if err := scanner.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, "reading standard input:", err)
+	}
+
+	return tmp
 }
 
 func inject(toInject, toReceive string, start, end int64) {
@@ -105,6 +130,12 @@ func inject(toInject, toReceive string, start, end int64) {
 	receivingWrite.Sync()
 }
 
+func injectAndFormat(toInject, toReceive string, start, end int64) {
+	tmpFile := formatTmp(toInject).Name()
+	inject(tmpFile, toReceive, start, end)
+	defer os.Remove(tmpFile)
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "cumulus"
@@ -119,13 +150,23 @@ func main() {
 		{
 			Name:  "format",
 			Usage: "format a cloud-config file into an acceptable JSON structure",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "tmp",
+					Usage: "write the cloud-config to a tmp file",
+				},
+				cli.StringFlag{
+					Name:  "out",
+					Usage: "write the cloud-config to this file",
+				},
+			},
 			Action: func(c *cli.Context) {
-				if len(c.Args()) == 1 {
-					format(c.Args().First())
-				} else if len(c.Args()) == 2 {
-					formatOut(c.Args().First(), c.Args().Get(1))
+				if c.String("out") != "" {
+					formatOut(c.Args().First(), c.String("out"))
+				} else if c.Bool("tmp") {
+					formatTmp(c.Args().First())
 				} else {
-					log.Fatal("Format takes one or two arguments.")
+					format(c.Args().First())
 				}
 
 			},
@@ -133,16 +174,20 @@ func main() {
 		{
 			Name:  "inject",
 			Usage: "inject a file into another, first removing from line1 to line2",
-			Action: func(c *cli.Context) {
-				start, _ := strconv.ParseInt(c.Args().Get(2), 0, 0)
-				end, _ := strconv.ParseInt(c.Args().Get(3), 0, 0)
-				inject(c.Args().First(), c.Args().Get(1), start, end)
-			},
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:  "format",
 					Usage: "format the cloud-config before injecting it",
 				},
+			},
+			Action: func(c *cli.Context) {
+				start, _ := strconv.ParseInt(c.Args().Get(2), 0, 0)
+				end, _ := strconv.ParseInt(c.Args().Get(3), 0, 0)
+				if c.Bool("format") == true {
+					injectAndFormat(c.Args().First(), c.Args().Get(1), start, end)
+				} else {
+					inject(c.Args().First(), c.Args().Get(1), start, end)
+				}
 			},
 		},
 	}
